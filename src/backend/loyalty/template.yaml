@@ -2,10 +2,15 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
   loyalty service
-  
+
 Globals:
   Function:
     Timeout: 5
+    Tracing: Active
+    MemorySize: 512
+  Api:
+    TracingEnabled: true
+    EndpointConfiguration: REGIONAL
 
 Parameters:
   Stage:
@@ -25,7 +30,7 @@ Resources:
   LoyaltyDataTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub LoyaltyData-${AWS::StackName}
+      TableName: !Sub Airline-LoyaltyData-${Stage}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: customerId
@@ -52,6 +57,7 @@ Resources:
   IngestFunc:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: !Sub Airline-IngestLoyalty-${Stage}
       CodeUri: build/ingest
       Handler: index.handler
       Runtime: nodejs8.10
@@ -61,6 +67,7 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref LoyaltyDataTable
+          STAGE: !Ref Stage
       Events:
         Listener:
           Type: SNS
@@ -73,6 +80,7 @@ Resources:
   GetFunc:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: !Sub Airline-GetLoyalty-${Stage}
       CodeUri: build/get
       Handler: index.handler
       Runtime: nodejs8.10
@@ -82,6 +90,7 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref LoyaltyDataTable
+          STAGE: !Ref Stage
       Events:
         Api:
           Type: Api
@@ -89,7 +98,7 @@ Resources:
             Method: GET
             Path: /loyalty/{customerId}
             RestApiId: !Ref LoyaltyApi
-  
+
   LoyaltyEndpointParameter:
     Type: AWS::SSM::Parameter
     Properties:
@@ -100,14 +109,14 @@ Resources:
   LoyaltyApi:
     Type: AWS::Serverless::Api
     Properties:
-      Name: !Sub 'LoyaltyApi-${Stage}'
+      Name: !Sub Airline-Loyalty-${Stage}
       StageName: Prod
       # Cors:
       #   AllowOrigin: "'*'"
       #   AllowHeaders:
       #     "'Content-Type,Authorization,X-Amz-Date'"
       #   MaxAge: "'600'"
-      #TracingEnabled: True
+      TracingEnabled: True
       # AccessLogSetting:
       #   - DestinationArn: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group/custom_log_group_name"
       #     Format: "$context.identity.sourceIp $context.identity.caller $context.identity.user [$context.requestTime] "$context.httpMethod $context.resourcePath $context.protocol" $context.status $context.responseLength $context.requestId"
